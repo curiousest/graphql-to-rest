@@ -1,57 +1,48 @@
 from functools import partial
 
 import graphene
-
-from src.external_rest import ExternalRESTObject
+from graphql_to_rest import ExternalRESTField
 
 HOST = 'http://test'
 
 
-class Faction(ExternalRESTObject):
+class Faction(graphene.ObjectType):
     endpoint = '{}/factions'.format(HOST)
 
     id = graphene.Int()
     name = graphene.String(name='name')
-    heroes = graphene.List(
+    heroes = ExternalRESTField(
         partial(lambda: Hero),
-        resolver=partial(lambda *args, **kwargs: Hero.generate_resolver(
-            filter_to_source_dict={'faction_id': 'id'}, is_list=True
-        )(*args, **kwargs))
+        source_to_filter_dict={'id': 'faction_id'},
     )
 
 
-class Hero(ExternalRESTObject):
+class Hero(graphene.ObjectType):
     endpoint = '{}/heroes'.format(HOST)
     id = graphene.Int()
     name = graphene.String(name='name')
     faction_id = graphene.Int()
-    faction = graphene.Field(
+    faction = ExternalRESTField(
         Faction,
-        resolver=Faction.generate_resolver(
-            filter_to_source_dict={'id': 'faction_id'}, is_list=False
-        )
+        retrieve_by_id_field='faction_id',
     )
     friend_ids = graphene.List(graphene.Int)
-    friends = graphene.List(
+    friends = ExternalRESTField(
         partial(lambda: Hero),
-        resolver=partial(lambda *args, **kwargs: Hero.generate_resolver(
-            filter_to_source_dict={'id': 'friend_ids'}, is_list=True
-        )(*args, **kwargs))
+        source_to_filter_dict={'friend_ids': 'id'},
     )
 
 
 class Query(graphene.ObjectType):
 
-    factions = graphene.List(
+    factions = ExternalRESTField(
         Faction,
         id=graphene.Argument(graphene.ID),
-        resolver=Faction.generate_resolver(filter_by_parent_fields=False)
     )
 
-    heroes = graphene.List(
+    heroes = ExternalRESTField(
         Hero,
         id=graphene.Argument(graphene.ID),
-        resolver=Hero.generate_resolver(filter_by_parent_fields=False)
     )
 
 schema = graphene.Schema(query=Query)
