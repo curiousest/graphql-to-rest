@@ -3,6 +3,8 @@ import requests
 from functools import partial
 
 import graphene
+from promise import Promise
+from promise.dataloader import DataLoader
 from graphql_to_rest import reduce_fields_to_object
 
 HOST = 'http://test'
@@ -31,6 +33,12 @@ class Faction(graphene.ObjectType):
             json_result=response.json()['results']
         )
 
+
+class HeroLoader(DataLoader):
+    def batch_load_fn(self, keys):
+        import pytest; pytest.set_trace()
+        return Promise.resolve(keys)
+hero_loader = HeroLoader()
 
 class Hero(graphene.ObjectType):
     endpoint = '{}/heroes'.format(HOST)
@@ -62,6 +70,7 @@ class Hero(graphene.ObjectType):
             Hero.endpoint,
             ','.join([str(id) for id in self.friend_ids])
         )
+        return hero_loader.load_many(self.friend_ids)
         response = requests.get(url, headers=headers)
         return reduce_fields_to_object(
             object_class=Hero,

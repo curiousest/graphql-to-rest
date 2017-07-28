@@ -264,6 +264,48 @@ class ExternalRESTTestClass:
             )
         assert m.request_history[0]._request.headers['X-This-Header'] == 'exists'
 
+    def test_batch_requests(self, client):
+        query = '''
+        {
+            heroes (id: 5) {
+                id
+                friends {
+                    id
+                    friends {
+                        id
+                    }
+                }
+            }
+        }
+        '''
+        data = {'query': query}
+
+        with requests_mock.mock() as m:
+            m.get('http://test/heroes/?id=5', json={
+                'results': [hero_1_data, hero_2_data]
+            })
+            m.get('http://test/heroes/?id=6,7', json={
+                'results': [hero_1_data, hero_2_data, hero_3_data]
+            })
+            m.get('http://test/heroes/?id=6,7,5,6', json={
+                'results': [hero_1_data, hero_2_data, hero_3_data]
+            })
+
+            response = client.post(
+                self.graphql_host,
+                data=json.dumps(data),
+                content_type='application/json',
+            )
+        assert response.status_code == 200, "{} error: {}".format(
+            response.status_code, response.data
+        )
+        json_response = json.loads(response.data.decode())
+
+        assert 'errors' not in json_response, "error: {}".format(
+            response.data
+        )
+        assert len(m.request_history) == 3, 'Requests weren`t batched'
+
 
 class TestCompressedSchema(ExternalRESTTestClass):
     graphql_host = '/graphql/compressed'
