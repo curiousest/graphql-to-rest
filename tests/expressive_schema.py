@@ -1,6 +1,6 @@
 import json
 import requests
-from functools import partial
+from functools import partial, reduce
 
 import graphene
 from promise import Promise
@@ -8,6 +8,15 @@ from promise.dataloader import DataLoader
 from graphql_to_rest import reduce_fields_to_object
 
 HOST = 'http://test'
+
+def chain(list_of_functions, first_value):
+    return reduce(lambda x, y: y(x), list_of_functions, first_value)
+
+def then_chain(*args):
+    value = args[0]
+    for fn in args[1:]:
+        value = value.then(fn)
+    return value
 
 
 class Faction(graphene.ObjectType):
@@ -35,13 +44,20 @@ class Faction(graphene.ObjectType):
 
 
 class HeroLoader(DataLoader):
-    def batch_load_fn(self, keys):
-        import pytest; pytest.set_trace()
-        return Promise.resolve(keys)
-hero_loader = HeroLoader()
+    def batch_load_fn(self, friend_ids):
+        url = '{}/?id={}'.format(
+            Hero.endpoint,
+            ','.join([str(id) for id in friend_ids])
+        )
+        response = requests.get(url, headers=self.headers)
+        results = response.json()['results']
+        return Promise.resolve(results)
 
+        
 class Hero(graphene.ObjectType):
     endpoint = '{}/heroes'.format(HOST)
+    data_loader = HeroLoader()
+
     id = graphene.Int()
     name = graphene.String(name='name')
     faction_id = graphene.Int()
@@ -64,18 +80,14 @@ class Hero(graphene.ObjectType):
         )
 
     def resolve_friends(self, args, context, info):
-        headers = dict(context.headers)
+        self.data_loader.headers = dict(context.headers)
+        heroes_json = self.data_loader.load_many(self.friend_ids)
+        return heroes_json.then(self.resolve_friends_promise)
 
-        url = '{}/?id={}'.format(
-            Hero.endpoint,
-            ','.join([str(id) for id in self.friend_ids])
-        )
-        return hero_loader.load_many(self.friend_ids)
-        response = requests.get(url, headers=headers)
+    def resolve_friends_promise(self, heroes_json):
+        friends_json = filter(lambda h: h['id'] in self.friend_ids, heroes_json)
         return reduce_fields_to_object(
-            object_class=Hero,
-            is_list=True,
-            json_result=response.json()['results']
+            object_class=Hero, is_list=True, json_result=friends_json
         )
 
 
