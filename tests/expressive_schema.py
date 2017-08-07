@@ -3,8 +3,7 @@ import requests
 from functools import partial
 
 import graphene
-
-from src.external_rest import reduce_fields_to_object
+from graphql_to_rest import reduce_fields_to_object
 
 HOST = 'http://test'
 
@@ -85,12 +84,28 @@ class Query(graphene.ObjectType):
 
     def resolve_factions(self, args, context, info):
         headers = dict(context.headers)
+        # if you wanted to pass data along to future requests, you'd have to
+        # do this in each resolve method
+        data = json.loads(context.data.decode("utf-8"))
+        del data['query']
 
-        url = '{}/?id={}'.format(
+        # if you wanted to pass query params along to future requests,
+        # you'd have to do this in each method
+        query_params = [qp.split('=')
+                        for qp
+                        in context.query_string.decode("utf-8").split("&")
+                        if qp]
+        query_params = {qp[0]: next(iter(qp[1:]), '')
+                        for qp in query_params}
+        query_params['id'] = args['id']
+
+        url = '{}/?{}'.format(
             Faction.endpoint,
-            args['id']
+            '&'.join([key + '=' + str(value)
+                      for key, value in query_params.items()])
         )
-        response = requests.get(url, headers=headers)
+
+        response = requests.get(url, data=data, headers=headers)
         return reduce_fields_to_object(
             object_class=Faction,
             is_list=True,

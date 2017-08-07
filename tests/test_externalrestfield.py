@@ -211,7 +211,34 @@ class ExternalRESTTestClass:
             )
         # this will error if the mock get url (with query params) doesn't
         # match what is requested
-        pass
+        requested_query_string = m.request_history[0].query
+        assert 'this_query_param=exists' in requested_query_string
+        assert 'that_query_param=exists' in requested_query_string
+
+    def test_passes_data(self, client):
+        query = '''
+        {
+            factions (id: "1") {
+                id
+            }
+        }
+        '''
+        data = {'query': query, 'this_data': 'exists'}
+
+        with requests_mock.mock() as m:
+            m.get(
+                'http://test/factions/?id=1',
+                json={
+                    'results': [faction_1_data]
+                })
+            response = client.post(
+                self.graphql_host,
+                data=json.dumps(data),
+                content_type='application/json',
+            )
+        # this will error if the mock get url (with query params) doesn't
+        # match what is requested
+        assert 'this_data' in m.request_history[0].text
 
     def test_passes_headers(self, client):
         query = '''
@@ -243,5 +270,7 @@ class TestCompressedSchema(ExternalRESTTestClass):
 
 
 class TestExpressiveSchema(ExternalRESTTestClass):
+    # for sanity and comparison, show what ExternalRESTField is doing under the
+    # hood using the expressive schema
     graphql_host = '/graphql/expressive'
 

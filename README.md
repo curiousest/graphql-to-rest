@@ -25,28 +25,35 @@ You must:
 ### Schema definition
 
 ```python
+from functools import partial
 import graphene
-from external_rest import ExternalRESTObject
+from graphql_to_rest import ExternalRESTField
 
-class Hero(ExternalRESTObject):
+class Hero(graphene.ObjectType):
     endpoint = "http://your-host/heroes"
     
     id = graphene.Int()
     name = graphene.String(name='name')
-    friend_ids = graphene.List(graphene.Int)
-    friends = graphene.List(
-        partial(lambda: Hero),
-        resolver=partial(lambda *args, **kwargs: Hero.generate_resolver(
-            filter_to_source_dict={'id': 'friend_ids'}, is_list=True
-        )(*args, **kwargs))
+
+    movies_appeared_in_ids = graphene.List(graphene.Int)
+    movies_appeared_in = ExternalRESTField(
+        partial(lambda: Movie),
+        source_to_filter_dict={'movies_appeared_in_ids': 'id'},
     )
+
+
+class Movie(graphene.ObjectType):
+    endpoint = "http://another-host/movies"
+    
+    id = graphene.Int()
+    name = graphene.String(name='name')
+
 
 class Query(graphene.ObjectType):
 
-    heroes = graphene.List(
+    heroes = ExternalRESTField(
         Hero,
         id=graphene.Argument(graphene.ID),
-        resolver=Hero.generate_resolver(filter_by_parent_fields=False)
     )
 
 schema = graphene.Schema(query=Query)
@@ -62,7 +69,7 @@ query = '''
 {
     heroes (id: "5") {
         id
-        friends {
+        movies_appeared_in {
             id
             name
         }
@@ -71,13 +78,24 @@ query = '''
 '''
 data = {'query': query}
 response = requests.get(
-    "http://your-host/graphql/", 
+    "http://graphql-app-host/graphql/", 
     data=json.dumps(data), 
     content_type='application/json'
 )
 print(response.json())
 
-> {"data":{"heroes":[{"id":5,"friends":[{"id":6,"name":"Obi"},{"id":7,"name":"Yoda"}]}]}}
+{"data": {
+    "heroes": [
+        {
+            "id": 5,
+            "movies_appeared_in": [
+                {"id": 1, "name": "Movie Name X"},
+                {"id": 2, "name": "Movie Name Y"}
+]}]}}
+
+# the request to http://graphql-app-host/graphql makes two requests to the heroes endpoint:
+# GET http://your-host/heroes?id=5
+# GET http://another-host/movies?id=1,2
 
 ```
 
@@ -87,3 +105,9 @@ print(response.json())
 py.test
 py.test --capture=no # if you want to `import pytest; pytest.set_trace()`
 ```
+
+## Build next
+
+- [ ] [Quickstart app](https://github.com/curiousest/graphql-to-rest-example)
+- [ ] [Resolve nested external fields in batches]()
+- 
