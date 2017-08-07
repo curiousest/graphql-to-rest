@@ -38,6 +38,7 @@ class Query(graphene.ObjectType):
     factions = ExternalRESTField(
         Faction,
         id=graphene.Argument(graphene.ID),
+        top_level=True
     )
 
     heroes = ExternalRESTField(

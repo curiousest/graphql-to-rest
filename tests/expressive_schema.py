@@ -9,15 +9,6 @@ from graphql_to_rest import reduce_fields_to_object
 
 HOST = 'http://test'
 
-def chain(list_of_functions, first_value):
-    return reduce(lambda x, y: y(x), list_of_functions, first_value)
-
-def then_chain(*args):
-    value = args[0]
-    for fn in args[1:]:
-        value = value.then(fn)
-    return value
-
 
 class Faction(graphene.ObjectType):
     endpoint = '{}/factions'.format(HOST)

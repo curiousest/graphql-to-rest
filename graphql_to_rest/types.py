@@ -3,7 +3,9 @@ import inspect
 import json
 import requests
 import graphene
-
+from promise import Promise
+from promise.dataloader import DataLoader
+from flask import request
 
 def is_non_str_iterable(obj):
     return type(obj) != str and hasattr(obj, '__iter__')
@@ -31,13 +33,67 @@ def get_actual_object_class(obj):
     return obj
 
 
+class ExternalRESTDataLoader(DataLoader):
+
+    def use_batched_values(self, context, headers, data, query_params, source_values):
+        query_params[context.filter_field_name] = source_values
+
+    def batch_load_fn(self, source_values):
+        headers = dict(request.headers)
+        data = json.loads(request.data.decode("utf-8"))
+
+        query_params = [qp.split('=')
+                        for qp
+                        in request.query_string.decode("utf-8").split("&")
+                        if qp]
+        # it's hard to optionally get an item from a list in a
+        # dictionary comprehension
+        query_params = {qp[0]: next(iter(qp[1:]), '')
+                        for qp in query_params}
+
+        self.use_batched_values(headers, data, query_params, source_values)
+
+        response = cls.make_request(
+            resolver_args=args,
+            base_url=rest_object_class.endpoint,
+            query_params=query_params,
+            data=data,
+            headers=headers,
+            context=context,
+            info=info,
+            parent_object=parent_object,
+            source_to_filter_dict=source_to_filter_dict,
+            is_list=is_list,
+            *class_args,
+            **class_kwargs
+        )
+
+        result = cls.retrieve_results(
+            json_response=response.json(),
+            resolver_args=args,
+            base_url=rest_object_class.endpoint,
+            query_params=query_params,
+            headers=headers,
+            context=context,
+            info=info,
+            is_list=is_list,
+            parent_object=parent_object,
+            source_to_filter_dict=source_to_filter_dict,
+            *class_args,
+            **class_kwargs
+        )
+
+        return reduce_fields_to_object(rest_object_class, is_list, result)
+
+
 class ExternalRESTField(graphene.Field):
 
-    def __init__(self, rest_object_class, source_to_filter_dict=None, retrieve_by_id_field=None, *args, **kwargs):
+    def __init__(self, rest_object_class, source_to_filter_dict=None, retrieve_by_id_field=None, is_top_level=False, *args, **kwargs):
         self.source_to_filter_dict = source_to_filter_dict
         self.retrieve_by_id_field = retrieve_by_id_field
         self.is_list = retrieve_by_id_field is None
         self.rest_object_class = rest_object_class
+        self.is_top_level = is_top_level
 
         if self.is_list:
             super().__init__(graphene.List(rest_object_class), *args, **kwargs)
@@ -130,9 +186,9 @@ class ExternalRESTField(graphene.Field):
             return json_response
 
     @classmethod
-    def generate_resolver(cls, rest_object_class, is_list, *class_args, **class_kwargs):
+    def generate_resolver(cls, rest_object_class, source_to_filter_dict, is_list, *class_args, **class_kwargs):
 
-        def endpoint_resolver(parent_object, args, context, info):
+        def endpoint_resolver_promise(parent_object, args, context, info, field_filters):
             headers = dict(context.headers)
             data = json.loads(context.data.decode("utf-8"))
 
@@ -154,6 +210,7 @@ class ExternalRESTField(graphene.Field):
                 context=context,
                 info=info,
                 parent_object=parent_object,
+                source_to_filter_dict=source_to_filter_dict,
                 is_list=is_list,
                 *class_args,
                 **class_kwargs
@@ -169,9 +226,19 @@ class ExternalRESTField(graphene.Field):
                 info=info,
                 is_list=is_list,
                 parent_object=parent_object,
+                source_to_filter_dict=source_to_filter_dict,
                 *class_args,
                 **class_kwargs
             )
 
             return reduce_fields_to_object(rest_object_class, is_list, result)
+
+        def endpoint_resolver(parent_object, args, context, info):
+            if cls.is_top_level:
+
+            result = cls.data_loader.load(getattr(parent_object, source_field_name))
+            result.then(
+                functools.partial(endpoint_resolver_promise, cls, args, context, info)
+            )
+
         return endpoint_resolver
