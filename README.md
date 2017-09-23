@@ -35,7 +35,7 @@ class Hero(graphene.ObjectType):
     name = graphene.String(name='name')
 
     movies_appeared_in_ids = graphene.List(graphene.Int)
-    friends = ExternalRESTField(
+    movies_appeared_in = ExternalRESTField(
         partial(lambda: Movie),
         source_to_filter_dict={'movies_appeared_in_ids': 'id'},
     )
