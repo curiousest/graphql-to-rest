@@ -7,6 +7,7 @@ It can:
 * Sit as a standalone Flask app in front/behind your authentication layer, somewhere in between your frontend and services' APIs
 * Communicate to services/APIs spanning multiple hosts
 * Conform to different [opinions](https://cloud.google.com/apis/design/) [of](https://hackernoon.com/restful-api-designing-guidelines-the-best-practices-60e1d954e7c9) [how](https://docs.atlassian.com/jira/REST/cloud/) [REST](https://github.com/Microsoft/api-guidelines/blob/vNext/Guidelines.md) [should](https://docs.stormpath.com/rest/product-guide/latest/reference.html) [work](http://www.vinaysahni.com/best-practices-for-a-pragmatic-restful-api)
+* Batch REST calls
 
 It can't:
 
@@ -107,6 +108,4 @@ py.test --capture=no # if you want to `import pytest; pytest.set_trace()`
 
 ## Build next
 
-- [ ] [Quickstart app](https://github.com/curiousest/graphql-to-rest-example)
-- [ ] [Resolve nested external fields in batches]()
-- 
+- [Quickstart app](https://github.com/curiousest/graphql-to-rest-example)
