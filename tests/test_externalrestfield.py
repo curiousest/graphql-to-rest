@@ -320,7 +320,7 @@ class ExternalRESTTestClass:
         assert 'name' in json_response['data']['heroes'][0]['friends'][0]['friends'][0]
         assert len(json_response['data']['heroes'][0]['friends'][0]['friends']) == 2
 
-
+'''
 class TestCompressedSchema(ExternalRESTTestClass):
     graphql_host = '/graphql/compressed'
 
@@ -329,4 +329,4 @@ class TestExpressiveSchema(ExternalRESTTestClass):
     # for sanity and comparison, show what ExternalRESTField is doing under the
     # hood using the expressive schema
     graphql_host = '/graphql/expressive'
- '''
+

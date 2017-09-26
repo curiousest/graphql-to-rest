@@ -5,7 +5,7 @@ from functools import partial, reduce
 import graphene
 from promise import Promise
 from promise.dataloader import DataLoader
-from graphql_to_rest import reduce_fields_to_object
+from graphql_to_rest import reduce_fields_to_objects
 
 HOST = 'http://test'
 
@@ -27,7 +27,7 @@ class Faction(graphene.ObjectType):
             self.id
         )
         response = requests.get(url, headers=headers)
-        return reduce_fields_to_object(
+        return reduce_fields_to_objects(
             object_class=Hero,
             is_list=True,
             json_result=response.json()['results']
@@ -36,6 +36,7 @@ class Faction(graphene.ObjectType):
 
 class HeroLoader(DataLoader):
     def batch_load_fn(self, friend_ids):
+        import logging; logging.error(friend_ids)
         url = '{}/?id={}'.format(
             Hero.endpoint,
             ','.join([str(id) for id in friend_ids])
@@ -64,7 +65,7 @@ class Hero(graphene.ObjectType):
             self.faction_id
         )
         response = requests.get(url, headers=headers)
-        return reduce_fields_to_object(
+        return reduce_fields_to_objects(
             object_class=Faction,
             is_list=False,
             json_result=response.json()
@@ -72,12 +73,13 @@ class Hero(graphene.ObjectType):
 
     def resolve_friends(self, args, context, info):
         self.data_loader.headers = dict(context.headers)
+        import logging; logging.error(self.friend_ids)
         heroes_json = self.data_loader.load_many(self.friend_ids)
         return heroes_json.then(self.resolve_friends_promise)
 
     def resolve_friends_promise(self, heroes_json):
         friends_json = filter(lambda h: h['id'] in self.friend_ids, heroes_json)
-        return reduce_fields_to_object(
+        return reduce_fields_to_objects(
             object_class=Hero, is_list=True, json_result=friends_json
         )
 
@@ -118,7 +120,7 @@ class Query(graphene.ObjectType):
         )
 
         response = requests.get(url, data=data, headers=headers)
-        return reduce_fields_to_object(
+        return reduce_fields_to_objects(
             object_class=Faction,
             is_list=True,
             json_result=response.json()['results']
@@ -132,7 +134,7 @@ class Query(graphene.ObjectType):
             args['id']
         )
         response = requests.get(url, headers=headers)
-        return reduce_fields_to_object(
+        return reduce_fields_to_objects(
             object_class=Hero,
             is_list=True,
             json_result=response.json()['results']
