@@ -13,6 +13,13 @@ def is_non_str_iterable(obj):
     return type(obj) != str and hasattr(obj, '__iter__')
 
 
+def equals_or_contains(member, comparator):
+    if is_non_str_iterable(comparator):
+        return member in comparator
+    else:
+        return member == comparator
+
+
 def reduce_fields_to_objects(object_class, json_result, is_list=True):
     if is_list:
         return [object_class(**{key: value
@@ -72,11 +79,13 @@ class RequestMaker():
 
     def generate_data_for_request(self):
         if not self.headers.get('Erase-Data', False) and self.forward_data:
-            if self.data.get('query', False):
+            data = copy(self.data)
+            if data.get('query', False):
                 # remove the graphql query from the data, and pass along the rest
-                del self.data['query']
+                del data['query']
         else:
             data = {}
+        return data
 
     def generate_url_for_request(self):
         query_params = self.generate_query_params()
@@ -126,7 +135,7 @@ class RequestMaker():
 
 class ExternalRESTField(graphene.Field):
 
-    def __init__(self, rest_object_class, source_field_name='id', filter_field_name='id', is_top_level=False, *args, **kwargs):
+    def __init__(self, rest_object_class, source_field_name='id', filter_field_name='id', is_top_level=False, many=False, *args, **kwargs):
         assert is_top_level or not (source_field_name == 'id' and filter_field_name == 'id') 
         self.source_field_name = source_field_name
         self.filter_field_name = filter_field_name
@@ -145,7 +154,11 @@ class ExternalRESTField(graphene.Field):
 
         self.data_loader = DataLoader(batch_load_fn)
 
-        super().__init__(graphene.List(rest_object_class), *args, **kwargs)
+        self.many = many
+        if self.many:
+            super().__init__(graphene.List(rest_object_class), *args, **kwargs)
+        else:
+            super().__init__(rest_object_class, *args, **kwargs)
 
     def get_resolver(self, parent_resolver):
         if self.resolver:
@@ -155,9 +168,15 @@ class ExternalRESTField(graphene.Field):
     
     def generate_resolver(self, rest_object_class, *class_args, **class_kwargs):
 
-        def endpoint_resolver_promise(parent_object, results):            
-            relevant_results = filter(lambda h: h['id'] in getattr(parent_object, self.source_field_name), results)
-            return reduce_fields_to_objects(rest_object_class, relevant_results)
+        def endpoint_resolver_promise(parent_object, results):
+            
+            relevant_results = list(filter(lambda h: equals_or_contains(h[self.filter_field_name], getattr(parent_object, self.source_field_name)), results))
+            if not self.many:
+                assert len(relevant_results) == 1
+                relevant_results = relevant_results[0]
+            
+            obj = reduce_fields_to_objects(rest_object_class, relevant_results, is_list=self.many)
+            return obj
 
         def endpoint_resolver(parent_object, args, context, info):
 

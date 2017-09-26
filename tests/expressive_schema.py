@@ -13,7 +13,7 @@ HOST = 'http://test'
 class Faction(graphene.ObjectType):
     endpoint = '{}/factions'.format(HOST)
 
-    id = graphene.Int()
+    id = graphene.ID()
     name = graphene.String(name='name')
     heroes = graphene.List(
         partial(lambda: Hero)
@@ -36,7 +36,6 @@ class Faction(graphene.ObjectType):
 
 class HeroLoader(DataLoader):
     def batch_load_fn(self, friend_ids):
-        import logging; logging.error(friend_ids)
         url = '{}/?id={}'.format(
             Hero.endpoint,
             ','.join([str(id) for id in friend_ids])
@@ -50,7 +49,7 @@ class Hero(graphene.ObjectType):
     endpoint = '{}/heroes'.format(HOST)
     data_loader = HeroLoader()
 
-    id = graphene.Int()
+    id = graphene.ID()
     name = graphene.String(name='name')
     faction_id = graphene.Int()
     faction = graphene.Field(Faction)
@@ -60,7 +59,7 @@ class Hero(graphene.ObjectType):
     def resolve_faction(self, args, context, info):
         headers = dict(context.headers)
 
-        url = '{}/{}/'.format(
+        url = '{}/?id={}'.format(
             Faction.endpoint,
             self.faction_id
         )
@@ -68,12 +67,11 @@ class Hero(graphene.ObjectType):
         return reduce_fields_to_objects(
             object_class=Faction,
             is_list=False,
-            json_result=response.json()
+            json_result=response.json()['results'][0]
         )
 
     def resolve_friends(self, args, context, info):
         self.data_loader.headers = dict(context.headers)
-        import logging; logging.error(self.friend_ids)
         heroes_json = self.data_loader.load_many(self.friend_ids)
         return heroes_json.then(self.resolve_friends_promise)
 

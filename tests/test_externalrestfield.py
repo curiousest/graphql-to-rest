@@ -89,7 +89,10 @@ class ExternalRESTTestClass:
                 json={
                     'results': [hero_1_data]
                 })
-            m.get('http://test/factions/1/', json=faction_1_data)
+            m.get('http://test/factions/?id=1', 
+                json={
+                    'results': [faction_1_data]
+                })
             response = client.post(
                 self.graphql_host,
                 data=json.dumps(data),
@@ -100,8 +103,9 @@ class ExternalRESTTestClass:
         )
         json_response = json.loads(response.data.decode())
         assert 'errors' not in json_response
-        assert json_response['data']['heroes'][0]['id'] == 5
-        assert json_response['data']['heroes'][0]['faction']['id'] == 1
+        
+        assert json_response['data']['heroes'][0]['id'] == '5'
+        assert json_response['data']['heroes'][0]['faction']['id'] == '1'
 
     def test_multiple_related_field_by_parent_id(self, client):
         query = '''
@@ -140,8 +144,8 @@ class ExternalRESTTestClass:
         json_response = json.loads(response.data.decode())
 
         assert 'errors' not in json_response
-        assert json_response['data']['factions'][0]['id'] == 1
-        assert 5 in [a['id']
+        assert json_response['data']['factions'][0]['id'] == '1'
+        assert '5' in [a['id']
                      for a in json_response['data']['factions'][0]['heroes']]
 
     def test_multiple_related_field_by_ids(self, client):
@@ -181,9 +185,9 @@ class ExternalRESTTestClass:
         assert 'errors' not in json_response, "error: {}".format(
             response.data
         )
-        assert json_response['data']['heroes'][0]['id'] == 5
-        assert json_response['data']['heroes'][0]['friends'][0]['id'] == 6
-        assert json_response['data']['heroes'][0]['friends'][1]['id'] == 7
+        assert json_response['data']['heroes'][0]['id'] == '5'
+        assert json_response['data']['heroes'][0]['friends'][0]['id'] == '6'
+        assert json_response['data']['heroes'][0]['friends'][1]['id'] == '7'
 
     def test_passes_query_params(self, client):
         query = '''
@@ -320,13 +324,14 @@ class ExternalRESTTestClass:
         assert 'name' in json_response['data']['heroes'][0]['friends'][0]['friends'][0]
         assert len(json_response['data']['heroes'][0]['friends'][0]['friends']) == 2
 
-'''
+
 class TestCompressedSchema(ExternalRESTTestClass):
     graphql_host = '/graphql/compressed'
 
-''' 
+
 class TestExpressiveSchema(ExternalRESTTestClass):
     # for sanity and comparison, show what ExternalRESTField is doing under the
     # hood using the expressive schema
     graphql_host = '/graphql/expressive'
+
 

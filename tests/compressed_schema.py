@@ -9,18 +9,19 @@ HOST = 'http://test'
 class Faction(graphene.ObjectType):
     base_url = '{}/factions'.format(HOST)
 
-    id = graphene.Int()
+    id = graphene.ID()
     name = graphene.String(name='name')
     heroes = ExternalRESTField(
         partial(lambda: Hero),
         source_field_name='id',
         filter_field_name='faction_id',
+        many=True
     )
 
 
 class Hero(graphene.ObjectType):
     base_url = '{}/heroes'.format(HOST)
-    id = graphene.Int()
+    id = graphene.ID()
     name = graphene.String(name='name')
     faction_id = graphene.Int()
     faction = ExternalRESTField(
@@ -32,6 +33,7 @@ class Hero(graphene.ObjectType):
         partial(lambda: Hero),
         source_field_name='friend_ids',
         filter_field_name='id',
+        many=True
     )
 
 
@@ -41,12 +43,14 @@ class Query(graphene.ObjectType):
         Faction,
         id=graphene.Argument(graphene.ID),
         is_top_level=True,
+        many=True
     )
 
     heroes = ExternalRESTField(
         Hero,
         id=graphene.Argument(graphene.ID),
         is_top_level=True,
+        many=True
     )
 
 schema = graphene.Schema(query=Query)
