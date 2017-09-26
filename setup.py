@@ -8,6 +8,9 @@ setup(
     install_requires=[
         'requests',
         'graphene',
-        'pytest'
+        'pytest',
+    ],
+    dependency_links=[
+        'http://github.com/curiousest/promise/tarball/master#egg=promise'
     ]
 )

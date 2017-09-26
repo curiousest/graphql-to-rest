@@ -89,7 +89,10 @@ class ExternalRESTTestClass:
                 json={
                     'results': [hero_1_data]
                 })
-            m.get('http://test/factions/1/', json=faction_1_data)
+            m.get('http://test/factions/?id=1', 
+                json={
+                    'results': [faction_1_data]
+                })
             response = client.post(
                 self.graphql_host,
                 data=json.dumps(data),
@@ -100,8 +103,9 @@ class ExternalRESTTestClass:
         )
         json_response = json.loads(response.data.decode())
         assert 'errors' not in json_response
-        assert json_response['data']['heroes'][0]['id'] == 5
-        assert json_response['data']['heroes'][0]['faction']['id'] == 1
+        
+        assert json_response['data']['heroes'][0]['id'] == '5'
+        assert json_response['data']['heroes'][0]['faction']['id'] == '1'
 
     def test_multiple_related_field_by_parent_id(self, client):
         query = '''
@@ -140,8 +144,8 @@ class ExternalRESTTestClass:
         json_response = json.loads(response.data.decode())
 
         assert 'errors' not in json_response
-        assert json_response['data']['factions'][0]['id'] == 1
-        assert 5 in [a['id']
+        assert json_response['data']['factions'][0]['id'] == '1'
+        assert '5' in [a['id']
                      for a in json_response['data']['factions'][0]['heroes']]
 
     def test_multiple_related_field_by_ids(self, client):
@@ -181,9 +185,9 @@ class ExternalRESTTestClass:
         assert 'errors' not in json_response, "error: {}".format(
             response.data
         )
-        assert json_response['data']['heroes'][0]['id'] == 5
-        assert json_response['data']['heroes'][0]['friends'][0]['id'] == 6
-        assert json_response['data']['heroes'][0]['friends'][1]['id'] == 7
+        assert json_response['data']['heroes'][0]['id'] == '5'
+        assert json_response['data']['heroes'][0]['friends'][0]['id'] == '6'
+        assert json_response['data']['heroes'][0]['friends'][1]['id'] == '7'
 
     def test_passes_query_params(self, client):
         query = '''
@@ -264,6 +268,62 @@ class ExternalRESTTestClass:
             )
         assert m.request_history[0]._request.headers['X-This-Header'] == 'exists'
 
+    def test_batch_requests(self, client):
+        query = '''
+        {
+            heroes (id: 5) {
+                id
+                friends {
+                    id
+                    friends {
+                        id
+                        name
+                    }
+                }
+            }
+        }
+        '''
+        data = {'query': query}
+
+        with requests_mock.mock() as m:
+            m.get('http://test/heroes/?id=5', json={
+                'results': [hero_1_data]
+            })
+            m.get('http://test/heroes/?id=6,7', json={
+                'results': [hero_2_data, hero_3_data]
+            })
+            m.get('http://test/heroes/?id=6,7,5', json={
+                'results': [hero_1_data, hero_2_data, hero_3_data]
+            })
+
+            response = client.post(
+                self.graphql_host,
+                data=json.dumps(data),
+                content_type='application/json',
+            )
+            
+        assert response.status_code == 200, "{} error: {}".format(
+            response.status_code, response.data
+        )
+        json_response = json.loads(response.data.decode())
+        assert 'errors' not in json_response, "error: {}".format(
+            response.data
+        )
+        # This is an upper bound - the results can be cached from previous calls. 
+        # When running just this test in the current version of graphene/promises, the following
+        # calls are made:
+        # http://test/heroes/?id=5
+        # http://test/heroes/?id=6,7
+        # http://test/heroes/?id=5
+        # When running the whole test suite, the following calls are made:
+        # http://test/heroes/?id=5
+        # http://test/heroes/?id=5
+        assert len(m.request_history) <= 3, 'Requests weren`t batched'
+
+        # make sure the json looks roughly correct
+        assert 'name' in json_response['data']['heroes'][0]['friends'][0]['friends'][0]
+        assert len(json_response['data']['heroes'][0]['friends'][0]['friends']) == 2
+
 
 class TestCompressedSchema(ExternalRESTTestClass):
     graphql_host = '/graphql/compressed'
@@ -273,4 +333,5 @@ class TestExpressiveSchema(ExternalRESTTestClass):
     # for sanity and comparison, show what ExternalRESTField is doing under the
     # hood using the expressive schema
     graphql_host = '/graphql/expressive'
+
 
