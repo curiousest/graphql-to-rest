@@ -30,23 +30,26 @@ from functools import partial
 import graphene
 from graphql_to_rest import ExternalRESTField
 
+
 class Hero(graphene.ObjectType):
-    endpoint = "http://your-host/heroes"
+    base_url = "http://your-host/heroes"
     
-    id = graphene.Int()
+    id = graphene.ID()
     name = graphene.String(name='name')
 
     movies_appeared_in_ids = graphene.List(graphene.Int)
     movies_appeared_in = ExternalRESTField(
         partial(lambda: Movie),
-        source_to_filter_dict={'movies_appeared_in_ids': 'id'},
+        source_field_name='movies_appeared_in_ids',
+        filter_field_name='id',
+        many=True
     )
 
 
 class Movie(graphene.ObjectType):
-    endpoint = "http://another-host/movies"
+    base_url = "http://another-host/movies"
     
-    id = graphene.Int()
+    id = graphene.ID()
     name = graphene.String(name='name')
 
 
@@ -55,6 +58,8 @@ class Query(graphene.ObjectType):
     heroes = ExternalRESTField(
         Hero,
         id=graphene.Argument(graphene.ID),
+        many=True,
+        is_top_level=True,
     )
 
 schema = graphene.Schema(query=Query)
