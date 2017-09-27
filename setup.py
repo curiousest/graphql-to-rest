@@ -2,8 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='graphql-to-rest',
-    version='0.1',
+    version='1.0',
     description='Make any REST API compatible with GraphQL',
+    url='https://github.com/curiousest/graphql-to-rest',
     packages=find_packages(),
     install_requires=[
         'requests',
